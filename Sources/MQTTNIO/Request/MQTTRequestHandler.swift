@@ -1,9 +1,8 @@
+import Logging
 import NIO
 import NIOConcurrencyHelpers
-import Logging
 
 final class MQTTRequestHandler: ChannelDuplexHandler {
-    
     // MARK: - Types
     
     typealias InboundIn = MQTTPacket.Inbound
@@ -71,9 +70,9 @@ final class MQTTRequestHandler: ChannelDuplexHandler {
     func failEntries() {
         eventLoop.assertInEventLoop()
         
-        self.entriesInflight.forEach { $0.fail(with: DeinitError()) }
+        entriesInflight.forEach { $0.fail(with: DeinitError()) }
         
-        let entriesQueue = self.lock.withLock { self.entriesQueue }
+        let entriesQueue = lock.withLock { self.entriesQueue }
         entriesQueue.forEach { $0.fail(with: DeinitError()) }
     }
     
@@ -96,19 +95,14 @@ final class MQTTRequestHandler: ChannelDuplexHandler {
         
         var didProcess = false
         withRequestContext(in: context) { requestContext in
-            for (index, entry) in entriesInflight.enumerated() {
+            entriesInflight = entriesInflight.compactMap { entry in
                 let result = entry.process(context: requestContext, packet: packet)
                 switch result {
                 case .unprocessed:
-                    continue
-                    
+                    return entry
                 case .processed(completed: let completed):
-                    if completed {
-                        entriesInflight.remove(at: index)
-                    }
-                    
                     didProcess = true
-                    break
+                    return completed ? nil : entry
                 }
             }
             
@@ -222,8 +216,8 @@ final class MQTTRequestHandler: ChannelDuplexHandler {
 extension MQTTRequestHandler: @unchecked MQTTSendable {}
 #endif
 
-extension MQTTRequestHandler {
-    fileprivate final class RequestContext: MQTTRequestContext {
+private extension MQTTRequestHandler {
+    final class RequestContext: MQTTRequestContext {
         private(set) var didWrite: Bool = false
         let handler: MQTTRequestHandler
         let context: ChannelHandlerContext
@@ -313,7 +307,7 @@ extension MQTTRequestHandler {
         }
     }
     
-    final private class Entry<Request: MQTTRequest>: AnyEntry {
+    private final class Entry<Request: MQTTRequest>: AnyEntry {
         let request: Request
         let promise: EventLoopPromise<Request.Value>
         
