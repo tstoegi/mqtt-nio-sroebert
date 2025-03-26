@@ -164,7 +164,7 @@ extension MQTTPacket {
                 flags.insert(.containsUsername)
                 try buffer.writeMQTTString(credentials.username, "Username")
                 
-                if var password = credentials.password, password.readableBytes > 0 {
+                if var password = credentials.password {
                     flags.insert(.containsPassword)
                     try buffer.writeMQTTDataWithLength(&password, "Password")
                 }
