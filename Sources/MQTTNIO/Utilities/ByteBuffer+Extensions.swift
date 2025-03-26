@@ -111,11 +111,12 @@ extension ByteBuffer {
     }
     
     mutating func writeMQTTDataWithLength(_ payload: inout ByteBuffer, _ errorVariableName: String) throws {
-        
+        reserveCapacity(minimumWritableBytes: 2 + payload.readableBytes)
+
         // Leave room for length
         let lengthIndex = writerIndex
         moveWriterIndex(forwardBy: 2)
-        
+
         let length = writeBuffer(&payload)
         guard length <= UInt16.max else {
             throw MQTTValueError.valueTooLarge(errorVariableName)
